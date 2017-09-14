@@ -33,6 +33,7 @@ def clearquit():
   os.system('clear')
   sys.exit(0)
 
+
 def run_process(command, stderr=False):
   p = subprocess.Popen([command], stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
   output = ""
@@ -135,15 +136,22 @@ if code == Dialog.OK:
       write_and_display_results(interfaces, selected_iface)
 
     if tag == Constants.STATIC:
+      new_address = '192.168.0.100'
+      new_netmask = '255.255.255.0'
+      new_gateway = '192.168.0.2'
+      if configured_iface is not None:
+        new_address = configured_iface["address"]
+        new_netmask = configured_iface["netmask"]
+        new_gateway = configured_iface["gateway"]
       while True:
         try:
           code, values = d.form(Constants.TXT_CONFIG_STATIC_TITLE, [
                                 # title, row_1, column_1, field, row_1, column_20, field_length, input_length
-                                ('IP Address', 1, 1, '192.168.0.10', 1, 20, 15, 15),
+                                ('IP Address', 1, 1, new_address, 1, 20, 15, 15),
                                 # title, row_2, column_1, field, row_2, column_20, field_length, input_length
-                                ('Netmask', 2, 1, '255.255.255.0', 2, 20, 15, 15),
+                                ('Netmask', 2, 1, new_netmask, 2, 20, 15, 15),
                                 # title, row_3, column_1, field, row_3, column_20, field_length, input_length
-                                ('Gateway', 3, 1, '192.168.0.1', 3, 20, 15, 15)
+                                ('Gateway', 3, 1, new_gateway, 3, 20, 15, 15)
                                 ], width=70)
 
           if (code == Dialog.CANCEL or code == Dialog.ESC):
