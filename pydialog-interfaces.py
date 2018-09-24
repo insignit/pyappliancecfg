@@ -138,9 +138,9 @@ def configure_interfaces(configured_iface, dlg, interfaces, selected_iface, tag)
 def main():
     # some sanity checks here, sudo only
     locale.setlocale(locale.LC_ALL, '')
-    if os.getuid() != 0:
-        print(Constants.TXT_ERR_ROOT_REQUIRED)
-        sys.exit(1)
+    # if os.getuid() != 0:
+    #    print(Constants.TXT_ERR_ROOT_REQUIRED)
+    #    sys.exit(1)
 
     # display available interfaces to configure
     interfaces = Interfaces()
@@ -148,22 +148,15 @@ def main():
     dlg.set_background_title(Constants.TXT_BACKGROUND_TITLE)
 
     code = dlg.yesno(Constants.TXT_WELCOME_TITLE,
-                   height="15", width=65, yes_label="OK", no_label="Cancel")
+                     height=15, width=65, yes_label="OK", no_label="Cancel")
 
     if code in (Dialog.CANCEL, Dialog.ESC):
         clear_quit()
 
-    available_adapters = []
-    available_iface_list = run_process("ifconfig -a | grep eth")['output']
-
-    for line in available_iface_list.splitlines():
-        elems = line.split(' ', 1)
-        iface = Iface(elems[0].strip(), elems[1].strip())
-        available_adapters.append(iface)
-
-    choices = []
-    for adapter in available_adapters:
-        choices.append((adapter.name, adapter.description))
+    choices = [
+        (adapter.attributes['name'], adapter.attributes['name'])
+        for adapter in interfaces.adapters
+        if adapter.attributes['name'] != 'lo']
 
     code, tag = dlg.menu(Constants.TXT_SELECT_INTERFACE, choices=choices)
     if code == Dialog.OK:
