@@ -62,7 +62,7 @@ def write_and_display_results(dlg, interfaces, selected_iface):
     interfaces.downAdapter(selected_iface)
     result = interfaces.upAdapter(selected_iface)
 
-    if result[0] == 0:
+    if not result[0]:
         text = Constants.TXT_NETWORK_CFG_SUCCESS
     else:
         text = Constants.TXT_NETWORK_CFG_ERROR
@@ -125,9 +125,9 @@ def configure_interfaces(configured_iface, dlg, interfaces, selected_iface, tag)
 def main():
     # some sanity checks here, sudo only
     locale.setlocale(locale.LC_ALL, '')
-    # if os.getuid() != 0:
-    #    print(Constants.TXT_ERR_ROOT_REQUIRED)
-    #    sys.exit(1)
+    if os.getuid() != 0:
+        print(Constants.TXT_ERR_ROOT_REQUIRED)
+        sys.exit(1)
 
     # display available interfaces to configure
     interfaces = Interfaces()
