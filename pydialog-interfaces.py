@@ -45,7 +45,10 @@ def write_and_display_results(dlg, interfaces, selected_iface):
     text = Constants.TXT_NETWORK_CFG_SUCCESS if result[0] \
         else Constants.TXT_NETWORK_CFG_ERROR
 
-    dlg.msgbox(text + result[1].decode('utf-8'))
+    msg = result[1].decode('utf-8')
+    msg = msg.split('isc.org/software/dhcp/')[-1]
+
+    dlg.msgbox(text + msg)
     clear_quit()
 
 
@@ -146,7 +149,7 @@ def main():
                 (Constants.STATIC, 'Static IP')])
         if code == Dialog.OK:
             configure_interfaces(
-                configured_iface,
+                configured_iface.export(),
                 dlg,
                 interfaces,
                 selected_iface,
