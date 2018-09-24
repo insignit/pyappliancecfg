@@ -184,7 +184,7 @@ def get_active_ip_values(iface_name):
 
     for line in route_res.splitlines():
         if 'via' in line and line.endswith(iface_name):
-            active_values['gateway'] = route_res.split('via')[-1].split()[0]
+            active_values['gateway'] = line.split('via')[-1].split()[0]
 
     return active_values
 
