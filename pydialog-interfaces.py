@@ -36,7 +36,7 @@ def to_str(s, encoding='utf-8'):
         if isinstance(s, (bytes, bytearray)):
             # https://docs.python.org/3/howto/unicode.html#the-unicode-type
             # replace error with U+FFFD, REPLACEMENT CHARACTER
-            return s.decode(encoding, "replace")
+            return s.decode(encoding, 'replace')
         raise TypeError('expected str, bytes, or bytearray not {}'.format(type(s)))
     else:
         if isinstance(s, bytearray):
@@ -227,9 +227,9 @@ def configure_interfaces(configured_iface, dlg, interfaces, selected_iface, tag)
         write_and_display_results(dlg, interfaces, selected_iface)
     if tag == Constants.STATIC:
         if configured_iface and configured_iface.get('address'):
-            new_address = configured_iface["address"]
-            new_netmask = configured_iface["netmask"]
-            new_gateway = configured_iface["gateway"]
+            new_address = configured_iface['address']
+            new_netmask = configured_iface['netmask']
+            new_gateway = configured_iface['gateway']
         else:
             # use current
             res = get_active_ip_values(selected_iface)
@@ -269,18 +269,18 @@ def configure_interfaces(configured_iface, dlg, interfaces, selected_iface, tag)
 
 def linux_interfaces():
     cmd1 = subprocess.Popen(
-            '{0} link show'.format(IP_PATH),
-            shell=True,
-            close_fds=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT).communicate()[0]
+        '{0} link show'.format(IP_PATH),
+        shell=True,
+        close_fds=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT).communicate()[0]
     cmd2 = subprocess.Popen(
         '{0} addr show'.format(IP_PATH),
         shell=True,
         close_fds=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT).communicate()[0]
-    return _interfaces_ip("{0}\n{1}".format(
+    return _interfaces_ip('{0}\n{1}'.format(
         to_str(cmd1),
         to_str(cmd2)))
 
@@ -298,7 +298,7 @@ def main():
     dlg.set_background_title(Constants.TXT_BACKGROUND_TITLE)
 
     code = dlg.yesno(Constants.TXT_WELCOME_TITLE,
-                     height=15, width=65, yes_label="OK", no_label="Cancel")
+                     height=15, width=65, yes_label='OK', no_label='Cancel')
 
     if code in (Dialog.CANCEL, Dialog.ESC):
         clear_quit()
