@@ -67,7 +67,7 @@ def write_and_display_results(dlg, interfaces, selected_iface):
     else:
         text = Constants.TXT_NETWORK_CFG_ERROR
 
-    dlg.msgbox(text + result[1])
+    dlg.msgbox(text + result[1].decode('utf-8'))
     clear_quit()
 
 
