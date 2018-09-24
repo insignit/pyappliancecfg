@@ -240,6 +240,8 @@ def configure_interfaces(configured_iface, dlg, interfaces, selected_iface, tag)
     if tag == Constants.STATIC:
         if not configured_iface or not configured_iface.get('address'):
             configured_iface = get_active_ip_values(selected_iface)
+            print(configured_iface)
+            sys.exit()
 
         new_address = configured_iface.get('address', '')
         new_netmask = configured_iface.get('netmask', '')
