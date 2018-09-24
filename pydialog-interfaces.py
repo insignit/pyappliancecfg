@@ -3,9 +3,7 @@
 from __future__ import print_function
 import locale
 import os
-import re
 import sys
-import subprocess
 from dialog import Dialog
 from debinterface.interfaces import Interfaces
 
@@ -38,34 +36,14 @@ def clear_quit():
     sys.exit(0)
 
 
-def run_process(command, stderr=False):
-    p = subprocess.Popen(
-        [command],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        shell=True)
-    output = ''
-
-    while True:
-        retcode = p.poll()
-        output += (p.stderr if stderr else p.stdout).readline().decode('utf-8')
-
-        if retcode is not None:
-            break
-
-    return {'retcode': retcode, 'output': output}
-
-
 def write_and_display_results(dlg, interfaces, selected_iface):
     interfaces.writeInterfaces()
 
     interfaces.downAdapter(selected_iface)
     result = interfaces.upAdapter(selected_iface)
 
-    if not result[0]:
-        text = Constants.TXT_NETWORK_CFG_SUCCESS
-    else:
-        text = Constants.TXT_NETWORK_CFG_ERROR
+    text = Constants.TXT_NETWORK_CFG_SUCCESS if result[0] \
+        else Constants.TXT_NETWORK_CFG_ERROR
 
     dlg.msgbox(text + result[1].decode('utf-8'))
     clear_quit()
@@ -148,6 +126,7 @@ def main():
     code, tag = dlg.menu(Constants.TXT_SELECT_INTERFACE, choices=choices)
     if code == Dialog.OK:
         selected_iface = tag
+
         # check if selected_iface is already listed or not in interfaces file
         # using debinterfaces
         configured_iface = None
