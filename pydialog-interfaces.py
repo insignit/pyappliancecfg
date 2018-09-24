@@ -167,11 +167,23 @@ def _interfaces_ip(out):
 
 def get_active_ip_values(iface_name):
     ifaces = linux_interfaces()
+
     active_values = {}
     if iface_name in ifaces \
             and 'inet' in ifaces[iface_name] \
             and ifaces[iface_name]['inet']:
         active_values = ifaces[iface_name]['inet'][0]
+
+    route_cmd = subprocess.Popen(
+        '{0} route'.format(IP_PATH),
+        shell=True,
+        close_fds=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT).communicate()[0]
+    route_res = to_str(route_cmd).strip()
+    if route_res.endswith(iface_name):
+        active_values['gateway'] = route_res.split('via')[-1].split()[0]
+
     return active_values
 
 
@@ -226,15 +238,12 @@ def configure_interfaces(configured_iface, dlg, interfaces, selected_iface, tag)
 
         write_and_display_results(dlg, interfaces, selected_iface)
     if tag == Constants.STATIC:
-        if configured_iface and configured_iface.get('address'):
-            new_address = configured_iface['address']
-            new_netmask = configured_iface['netmask']
-            new_gateway = configured_iface['gateway']
-        else:
-            # use current
-            res = get_active_ip_values(selected_iface)
-            print(res)
-            sys.exit()
+        if not configured_iface or not configured_iface.get('address'):
+            configured_iface = get_active_ip_values(selected_iface)
+
+        new_address = configured_iface.get('address', '')
+        new_netmask = configured_iface.get('netmask', '')
+        new_gateway = configured_iface.get('gateway', '')
 
         while True:
             try:
