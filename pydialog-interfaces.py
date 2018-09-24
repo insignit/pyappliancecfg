@@ -56,31 +56,21 @@ def run_process(command, stderr=False):
     return {'retcode': retcode, 'output': output}
 
 
-def network_restart(selected_iface):
-    # check if iface is up
-    results = run_process("ifconfig | grep " + selected_iface, stderr=False)
-    selected_iface_is_down = True
-    for line in results['output'].splitlines():
-        if re.match(selected_iface, line):
-            selected_iface_is_down = False
-
-        if selected_iface_is_down:
-            command = "ifup " + selected_iface
-        else:
-            command = "ifdown " + selected_iface + " && ifup " + selected_iface
-
-    return run_process(command, stderr=True)
+def network_restart(selected_iface, interfaces):
 
 
 def write_and_display_results(dlg, interfaces, selected_iface):
     interfaces.writeInterfaces()
-    results = network_restart(selected_iface)
-    if results['retcode'] == 0:
+
+    interfaces.downAdapter(selected_iface)
+    result = interfaces.upAdapter(selected_iface)
+
+    if result[0] == 0:
         text = Constants.TXT_NETWORK_CFG_SUCCESS
     else:
         text = Constants.TXT_NETWORK_CFG_ERROR
 
-    code = dlg.msgbox(text + results['output'])
+    dlg.msgbox(text + result[1])
     clear_quit()
 
 
@@ -154,7 +144,7 @@ def main():
         clear_quit()
 
     choices = [
-        (adapter.attributes['name'], adapter.attributes['name'])
+        (adapter.attributes['name'], '')
         for adapter in interfaces.adapters
         if adapter.attributes['name'] != 'lo']
 
