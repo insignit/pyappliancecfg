@@ -56,9 +56,6 @@ def run_process(command, stderr=False):
     return {'retcode': retcode, 'output': output}
 
 
-def network_restart(selected_iface, interfaces):
-
-
 def write_and_display_results(dlg, interfaces, selected_iface):
     interfaces.writeInterfaces()
 
