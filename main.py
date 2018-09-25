@@ -417,8 +417,8 @@ def restart_ntp_service():
 
 def write_ntp_settings(prim_time, fallback_time):
     lines = []
-    with open(TIME_SYNCD_CONF, 'r') as conffl:
-        for line in conffl:
+    with open(TIME_SYNCD_CONF, 'r') as conf_fl:
+        for line in conf_fl:
             lines.append(line)
             stripped = line.strip()
             if stripped.startswith('NTP='):
@@ -432,8 +432,8 @@ def write_ntp_settings(prim_time, fallback_time):
                 else:
                     lines.append(line)
 
-    with open(TIME_SYNCD_CONF, 'wr') as conffl:
-        conffl.writelines(lines)
+    with open(TIME_SYNCD_CONF, 'w') as conf_fl:
+        conf_fl.writelines(lines)
 
 
 def get_time_server_hints(prim_time, fallback_time):
