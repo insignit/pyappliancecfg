@@ -9,12 +9,12 @@ import sys
 from dialog import Dialog
 from debinterface.interfaces import Interfaces
 
-
 IP_PATH = '/sbin/ip'
+TIME_SYNCD_CONF = '/etc/systemd/timesyncd.conf'
+
 PY3 = sys.version_info[0] == 3
 if PY3:
     unicode = str
-
 
 IP4PATTERN = re.compile(r'(([01]?[0-9]?[0-9]|2[0-4][0-9]|2[5][0-5])\.)'
                         r'{3}([01]?[0-9]?[0-9]|2[0-4][0-9]|2[5][0-5])')
@@ -47,6 +47,25 @@ def to_str(s, encoding='utf-8'):
         raise TypeError('expected str, bytearray, or unicode')
 
 
+def get_term_output(cmd_list, cwd=None):
+    assert isinstance(cmd_list, list)
+    proc = subprocess.Popen(
+        cmd_list,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        cwd=cwd)
+    err = proc.stderr.read()
+    out = proc.stdout.read()
+    proc.kill()
+    return to_str(err) if err else '', to_str(out) if out else ''
+
+
+def get_term_stdout(cmd_list, cwd=None):
+    return get_term_output(
+        cmd_list=cmd_list,
+        cwd=cwd)[1]
+
+
 def cidr_to_ipv4_netmask(cidr_bits):
     """
     Returns an IPv4 netmask
@@ -71,7 +90,7 @@ def cidr_to_ipv4_netmask(cidr_bits):
     return netmask
 
 
-def _interfaces_ip(out):
+def parse_interfaces_ip(out):
     """
     Uses ip to return a dictionary of interfaces with various information about
     each (up/down state, ip address, netmask, and hwaddr)
@@ -99,7 +118,7 @@ def _interfaces_ip(out):
             mask = cidr
             if 'scope' in cols:
                 scope = cols[cols.index('scope') + 1]
-        return (ip, mask, brd, scope)
+        return ip, mask, brd, scope
 
     groups = re.compile('\r?\n\\d').split(out)
     for group in groups:
@@ -124,7 +143,7 @@ def _interfaces_ip(out):
             cols = line.split()
             if len(cols) >= 2:
                 type_, value = tuple(cols[0:2])
-                iflabel = cols[-1:][0]
+                if_label = cols[-1:][0]
                 if type_ in ('inet', 'inet6'):
                     if 'secondary' not in cols:
                         ipaddr, netmask, broadcast, scope = parse_network(
@@ -136,7 +155,7 @@ def _interfaces_ip(out):
                             addr_obj['address'] = ipaddr
                             addr_obj['netmask'] = netmask
                             addr_obj['broadcast'] = broadcast
-                            addr_obj['label'] = iflabel
+                            addr_obj['label'] = if_label
                             data['inet'].append(addr_obj)
                         elif type_ == 'inet6':
                             if 'inet6' not in data:
@@ -155,7 +174,7 @@ def _interfaces_ip(out):
                             'address': ip_,
                             'netmask': mask,
                             'broadcast': brd,
-                            'label': iflabel,
+                            'label': if_label,
                         })
                         del ip_, mask, brd, scp
                 elif type_.startswith('link'):
@@ -175,13 +194,7 @@ def get_active_ip_values(iface_name):
             and ifaces[iface_name]['inet']:
         active_values = ifaces[iface_name]['inet'][0]
 
-    route_cmd = subprocess.Popen(
-        '{0} route'.format(IP_PATH),
-        shell=True,
-        close_fds=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT).communicate()[0]
-    route_res = to_str(route_cmd).strip()
+    route_res = get_term_stdout([IP_PATH, 'route']).strip()
 
     for line in route_res.splitlines():
         line = line.strip()
@@ -198,14 +211,15 @@ class Constants:
     TXT_ERR_ROOT_REQUIRED = 'root privileges required. run with sudo'
     TXT_NETWORK_CFG_SUCCESS = 'Network configuration completed successfully!\n\n'
     TXT_NETWORK_CFG_ERROR = 'Error occured while configuring network interface!\n\n'
-    TXT_WELCOME_TITLE = 'Welcome to pydialog-interfaces configuration!\n\n' \
+    TXT_WELCOME_TITLE = 'Welcome to pyAppliance configuration!\n\n' \
                         'This tool helps you to set up your network interface.'
     TXT_SELECT_INTERFACE = 'Select interface'
     TXT_SELECT_SOURCE = 'Select address source'
     TXT_MESSAGE_DHCP = 'Configuring for DHCP provided address...'
     TXT_MESSAGE_STATIC = 'Configuring for static IP address...'
     TXT_MESSAGE_ERROR = '\Zb\Z1Error: %s\n\n\Z0Please try again.'
-    TXT_CONFIG_STATIC_TITLE = 'Provie the values for static IP configuration'
+    TXT_CONFIG_STATIC_TITLE = 'Provide the values for static IP configuration'
+    TXT_TIMESERVER_STATUS = 'Time Server Status\n\nPrimary:%s\nSecondary:%s'
 
 
 def clear_quit():
@@ -228,93 +242,82 @@ def write_and_display_results(dlg, interfaces, selected_iface):
     clear_quit()
 
 
-def configure_interfaces(configured_iface, dlg, interfaces, selected_iface, tag):
-    if tag == Constants.DHCP:
-        dlg.infobox(Constants.TXT_MESSAGE_DHCP)
+def configure_static_interface(
+        configured_iface,
+        dlg,
+        interfaces,
+        selected_iface):
+    if not configured_iface or not configured_iface.get('address'):
+        configured_iface = get_active_ip_values(selected_iface)
 
-        # simply add
-        interfaces.addAdapter({
-            'name': selected_iface,
-            'auto': True,
-            'addrFam': 'inet',
-            'source': Constants.DHCP}, 0)
+    new_address = configured_iface.get('address', '')
+    new_netmask = configured_iface.get('netmask', '')
+    new_gateway = configured_iface.get('gateway', '')
+    while True:
+        try:
+            code, values = dlg.form(Constants.TXT_CONFIG_STATIC_TITLE, [
+                # title, row_nr, column_nr, field,
+                #       row_nr, column_20, field_length, input_length
+                ('IP Address', 1, 1, new_address, 1, 20, 15, 15),
+                ('Netmask', 2, 1, new_netmask, 2, 20, 15, 15),
+                ('Gateway', 3, 1, new_gateway, 3, 20, 15, 15)], width=70)
 
-        write_and_display_results(dlg, interfaces, selected_iface)
-    if tag == Constants.STATIC:
-        if not configured_iface or not configured_iface.get('address'):
-            configured_iface = get_active_ip_values(selected_iface)
+            if code in (Dialog.CANCEL, Dialog.ESC):
+                clear_quit()
 
-        new_address = configured_iface.get('address', '')
-        new_netmask = configured_iface.get('netmask', '')
-        new_gateway = configured_iface.get('gateway', '')
+            code = dlg.infobox(Constants.TXT_MESSAGE_STATIC)
+            # simply add
+            interfaces.addAdapter({
+                'name': selected_iface,
+                'auto': True,
+                'addrFam': 'inet',
+                'source': Constants.STATIC,
+                'address': values[0],
+                'netmask': values[1],
+                'gateway': values[2]}, 0)
 
-        while True:
-            try:
-                code, values = dlg.form(Constants.TXT_CONFIG_STATIC_TITLE, [
-                    # title, row_1, column_1, field, row_1, column_20, field_length, input_length
-                    ('IP Address', 1, 1, new_address, 1, 20, 15, 15),
-                    # title, row_2, column_1, field, row_2, column_20, field_length, input_length
-                    ('Netmask', 2, 1, new_netmask, 2, 20, 15, 15),
-                    # title, row_3, column_1, field, row_3, column_20, field_length, input_length
-                    ('Gateway', 3, 1, new_gateway, 3, 20, 15, 15)], width=70)
+            write_and_display_results(dlg, interfaces, selected_iface)
+        except Exception as ex:
+            dlg.msgbox(text=Constants.TXT_MESSAGE_ERROR % ex, colors=True)
 
-                if code in (Dialog.CANCEL, Dialog.ESC):
-                    clear_quit()
 
-                code = dlg.infobox(Constants.TXT_MESSAGE_STATIC)
-                # simply add
-                interfaces.addAdapter({
-                    'name': selected_iface,
-                    'auto': True,
-                    'addrFam': 'inet',
-                    'source': Constants.STATIC,
-                    'address': values[0],
-                    'netmask': values[1],
-                    'gateway': values[2]}, 0)
-
-                write_and_display_results(dlg, interfaces, selected_iface)
-            except Exception as ex:
-                code = dlg.msgbox(
-                    text=Constants.TXT_MESSAGE_ERROR %
-                         ex, colors=True)
+def configure_dhcp_interface(dlg, interfaces, selected_iface):
+    dlg.infobox(Constants.TXT_MESSAGE_DHCP)
+    # simply add
+    interfaces.addAdapter({
+        'name': selected_iface,
+        'auto': True,
+        'addrFam': 'inet',
+        'source': Constants.DHCP}, 0)
+    write_and_display_results(dlg, interfaces, selected_iface)
 
 
 def linux_interfaces():
-    cmd1 = subprocess.Popen(
-        '{0} link show'.format(IP_PATH),
-        shell=True,
-        close_fds=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT).communicate()[0]
-    cmd2 = subprocess.Popen(
-        '{0} addr show'.format(IP_PATH),
-        shell=True,
-        close_fds=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT).communicate()[0]
-    return _interfaces_ip('{0}\n{1}'.format(
+    cmd1 = get_term_stdout([IP_PATH, 'link', 'show'])
+    cmd2 = get_term_stdout([IP_PATH, 'addr', 'show'])
+    return parse_interfaces_ip('{0}\n{1}'.format(
         to_str(cmd1),
         to_str(cmd2)))
 
 
-def main():
-    # some sanity checks here, sudo only
-    locale.setlocale(locale.LC_ALL, '')
-    if os.getuid() != 0:
-        print(Constants.TXT_ERR_ROOT_REQUIRED)
-        sys.exit(1)
+def check_selected_interface(interfaces, selected_iface):
+    # check if selected_iface is already listed or not in interfaces file
+    # using debinterfaces
+    configured_iface = None
+    for adapter in interfaces.adapters:
+        item = adapter.export()
+        if item['name'] == selected_iface:
+            configured_iface = item
+            break
+    # remove from adapter list if it is already configured
+    if configured_iface is not None:
+        interfaces.removeAdapterByName(selected_iface)
+    return configured_iface
 
-    # display available interfaces to configure
+
+def configure_interfaces(dlg):
+
     interfaces = Interfaces()
-    dlg = Dialog(dialog='dialog', autowidgetsize=True)
-    dlg.set_background_title(Constants.TXT_BACKGROUND_TITLE)
-
-    code = dlg.yesno(Constants.TXT_WELCOME_TITLE,
-                     height=15, width=65, yes_label='OK', no_label='Cancel')
-
-    if code in (Dialog.CANCEL, Dialog.ESC):
-        clear_quit()
-
     choices = [
         (adapter.attributes['name'], '')
         for adapter in interfaces.adapters
@@ -324,35 +327,82 @@ def main():
     if code == Dialog.OK:
         selected_iface = tag
 
-        # check if selected_iface is already listed or not in interfaces file
-        # using debinterfaces
-        configured_iface = None
-        for adapter in interfaces.adapters:
-            item = adapter.export()
-            if item['name'] == selected_iface:
-                configured_iface = item
-                break
-
-        # remove from adapter list if it is already configured
-        if configured_iface is not None:
-            interfaces.removeAdapterByName(selected_iface)
+        configured_iface = check_selected_interface(interfaces, selected_iface)
 
         code, tag = dlg.menu(
             Constants.TXT_SELECT_SOURCE, choices=[
                 (Constants.DHCP, 'Dynamic IP'),
                 (Constants.STATIC, 'Static IP')])
         if code == Dialog.OK:
-            configure_interfaces(
-                configured_iface,
-                dlg,
-                interfaces,
-                selected_iface,
-                tag)
-        else:
+            if tag == Constants.DHCP:
+                configure_dhcp_interface(dlg, interfaces, selected_iface)
+            if tag == Constants.STATIC:
+                configure_static_interface(
+                    configured_iface,
+                    dlg,
+                    interfaces,
+                    selected_iface)
+
+
+def get_time_settings():
+    prim = ''
+    fallback = ''
+    with open(TIME_SYNCD_CONF, 'r') as conffl:
+        for line in conffl:
+            stripped = line.strip()
+            if stripped.startswith('NTP='):
+                prim = stripped[4:]
+            elif stripped.startswith('FallbackNTP='):
+                fallback = stripped[12:]
+
+    return prim, fallback
+
+
+def get_timeserver_status():
+    return get_term_stdout(['timedatectl', 'status'])
+
+
+def conigure_ntp(dlg):
+    timeserver_status = get_timeserver_status()
+    prim_time, fallback_time = get_time_settings()
+
+    code, tag = dlg.yesno(
+        Constants.TXT_TIMESERVER_STATUS % (timeserver_status, prim_time, fallback_time),
+        height=15,
+        width=65,
+        yes_label='Change',
+        no_label='Cancel')
+
+    if code not in (Dialog.CANCEL, Dialog.ESC):
+        return
+
+
+def main(dlg):
+    while True:
+        code, tag = dlg.menu(
+            Constants.TXT_WELCOME_TITLE,
+            choices=[
+                ('Interfaces', 'static/dchp config'),
+                ('NTP', 'time server'),
+            ])
+
+        if code in (Dialog.CANCEL, Dialog.ESC):
             clear_quit()
-    else:
-        clear_quit()
+
+        if tag == 'Interfaces':
+            configure_interfaces(dlg)
+        else:
+            conigure_ntp(dlg)
 
 
 if __name__ == '__main__':
-    main()
+    # some sanity checks here, sudo only
+    locale.setlocale(locale.LC_ALL, '')
+    if os.getuid() != 0:
+        print(Constants.TXT_ERR_ROOT_REQUIRED)
+        sys.exit(1)
+
+    # display available interfaces to configure
+    dlg = Dialog(dialog='dialog', autowidgetsize=True)
+    dlg.set_background_title(Constants.TXT_BACKGROUND_TITLE)
+    main(dlg)
