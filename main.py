@@ -219,7 +219,9 @@ class Constants:
     TXT_MESSAGE_STATIC = 'Configuring for static IP address...'
     TXT_MESSAGE_ERROR = '\Zb\Z1Error: %s\n\n\Z0Please try again.'
     TXT_CONFIG_STATIC_TITLE = 'Provide the values for static IP configuration'
-    TXT_TIMESERVER_STATUS = 'Time Server Status:\n\n{0}\n\nNTP:{1}\nFallback:{2}'
+    TXT_TIMESERVER_STATUS = 'Time Server Status:\n\n{0}\n\n{1}'
+    TXT_NTP_SERVERS = 'NTP Server:{0}\nFallback:{1}'
+    TXT_CONFIG_NTP_TITLE = 'Provide NTP server addresses'
 
 
 def clear_quit():
@@ -263,7 +265,7 @@ def configure_static_interface(
                 ('Gateway', 3, 1, new_gateway, 3, 20, 15, 15)], width=70)
 
             if code in (Dialog.CANCEL, Dialog.ESC):
-                clear_quit()
+                return
 
             code = dlg.infobox(Constants.TXT_MESSAGE_STATIC)
             # simply add
@@ -362,20 +364,29 @@ def get_timeserver_status():
     return get_term_stdout(['timedatectl', 'status'])
 
 
-def conigure_ntp(dlg):
+def configure_ntp(dlg):
     timeserver_status = get_timeserver_status()
     prim_time, fallback_time = get_time_settings()
+
+    ntp_txt = Constants.TXT_NTP_SERVERS.format(prim_time, fallback_time) \
+        if (prim_time or fallback_time) else ''
 
     code, tag = dlg.yesno(
         Constants.TXT_TIMESERVER_STATUS.format(
             timeserver_status,
-            prim_time,
-            fallback_time),
-        yes_label='Change',
+            ntp_txt),
+        yes_label='Set NTP',
         no_label='Cancel')
 
     if code not in (Dialog.CANCEL, Dialog.ESC):
-        return
+        code, values = dlg.form(Constants.TXT_CONFIG_STATIC_TITLE, [
+            # title, row_nr, column_nr, field,
+            #       row_nr, column_20, field_length, input_length
+            ('Primary', 1, 1, prim_time, 1, 20, 15, 45),
+            ('Fallback', 2, 1, fallback_time, 2, 20, 15, 45)], width=70)
+
+        if code in (Dialog.CANCEL, Dialog.ESC):
+            return
 
 
 def main(dlg):
@@ -393,7 +404,7 @@ def main(dlg):
         if tag == 'Interfaces':
             configure_interfaces(dlg)
         else:
-            conigure_ntp(dlg)
+            configure_ntp(dlg)
 
 
 if __name__ == '__main__':
