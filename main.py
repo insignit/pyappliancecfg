@@ -371,8 +371,6 @@ def conigure_ntp(dlg):
             timeserver_status,
             prim_time,
             fallback_time),
-        height=15,
-        width=65,
         yes_label='Change',
         no_label='Cancel')
 
