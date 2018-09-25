@@ -6,11 +6,15 @@ import os
 import re
 import subprocess
 import sys
+from os import listdir
+
 from dialog import Dialog
 from debinterface.interfaces import Interfaces
 
 IP_PATH = '/sbin/ip'
 TIME_SYNCD_CONF = '/etc/systemd/timesyncd.conf'
+DHCP_DIR = '/var/lib/dhcp/'
+DEFAULT_NTP_SERVERS = '0.pool.ntp.org 1.pool.ntp.org 2.pool.ntp.org 3.pool.ntp.org'
 
 PY3 = sys.version_info[0] == 3
 if PY3:
@@ -379,7 +383,12 @@ def configure_ntp(dlg):
         no_label='Cancel')
 
     if code not in (Dialog.CANCEL, Dialog.ESC):
-        code, values = dlg.form(Constants.TXT_CONFIG_STATIC_TITLE, [
+        if not prim_time or not fallback_time:
+            prim_time, fallback_time = get_time_server_hints(
+                prim_time,
+                fallback_time)
+
+        code, values = dlg.form(Constants.TXT_CONFIG_NTP_TITLE, [
             # title, row_nr, column_nr, field,
             #       row_nr, column_20, field_length, input_length
             ('Primary', 1, 1, prim_time, 1, 20, 15, 45),
@@ -387,6 +396,47 @@ def configure_ntp(dlg):
 
         if code in (Dialog.CANCEL, Dialog.ESC):
             return
+
+
+def get_time_server_hints(prim_time, fallback_time):
+    dhcp_lease_options = get_current_dhcp_options()
+    if dhcp_lease_options \
+            and 'domain-name-servers' in dhcp_lease_options:
+        dns_servers = dhcp_lease_options['domain-name-servers'].split(',')
+        if dns_servers:
+
+            if not prim_time:
+                prim_time = dns_servers[0]
+
+            if not fallback_time and len(dns_servers) > 1:
+                fallback_time = dns_servers[1]
+
+    if not prim_time:
+        prim_time = DEFAULT_NTP_SERVERS
+
+    return prim_time, fallback_time
+
+
+def get_current_dhcp_options():
+    """
+    Currently just returns the first lease values it finds and does no checking
+
+    :return:
+    """
+    for file in listdir(DHCP_DIR):
+        with open(file, 'r') as fl:
+            in_lease = False
+            current_lease_options = {}
+            for line in fl.readlines():
+                line = line.strip()
+                if in_lease:
+                    if line == '}':
+                        return current_lease_options
+                    elif line.startswith('option '):
+                        option_name, value = line.split(' ', 1)
+                        current_lease_options[option_name] = value
+                elif line.startswith('lease') and line.endswith('{'):
+                    in_lease = True
 
 
 def main(dlg):
