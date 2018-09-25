@@ -37,7 +37,8 @@ def to_str(s, encoding='utf-8'):
             # https://docs.python.org/3/howto/unicode.html#the-unicode-type
             # replace error with U+FFFD, REPLACEMENT CHARACTER
             return s.decode(encoding, 'replace')
-        raise TypeError('expected str, bytes, or bytearray not {}'.format(type(s)))
+        raise TypeError(
+            'expected str, bytes, or bytearray not {}'.format(type(s)))
     else:
         if isinstance(s, bytearray):
             return str(s)
@@ -221,8 +222,7 @@ def write_and_display_results(dlg, interfaces, selected_iface):
     text = Constants.TXT_NETWORK_CFG_SUCCESS if result[0] \
         else Constants.TXT_NETWORK_CFG_ERROR
 
-    msg = result[1].decode('utf-8')
-    msg = msg.split('isc.org/software/dhcp/')[-1]
+    msg = to_str(result[1]).split('isc.org/software/dhcp/')[-1]
 
     dlg.msgbox(text + msg)
     clear_quit()
@@ -230,7 +230,7 @@ def write_and_display_results(dlg, interfaces, selected_iface):
 
 def configure_interfaces(configured_iface, dlg, interfaces, selected_iface, tag):
     if tag == Constants.DHCP:
-        code = dlg.infobox(Constants.TXT_MESSAGE_DHCP)
+        dlg.infobox(Constants.TXT_MESSAGE_DHCP)
 
         # simply add
         interfaces.addAdapter({
