@@ -400,17 +400,18 @@ def configure_ntp(dlg):
 
 
 def get_time_server_hints(prim_time, fallback_time):
-    dhcp_lease_options = get_current_dhcp_options()
-    if dhcp_lease_options \
-            and 'domain-name-servers' in dhcp_lease_options:
-        dns_servers = dhcp_lease_options['domain-name-servers'].split(',')
-        if dns_servers:
+    for dhcp_lease_options in get_dhcp_options():
+        print('found options', dhcp_lease_options)
+        if dhcp_lease_options \
+                and 'domain-name-servers' in dhcp_lease_options:
+            dns_servers = dhcp_lease_options['domain-name-servers'].split(',')
+            if dns_servers:
 
-            if not prim_time:
-                prim_time = dns_servers[0]
+                if not prim_time:
+                    prim_time = dns_servers[0]
 
-            if not fallback_time and len(dns_servers) > 1:
-                fallback_time = dns_servers[1]
+                if not fallback_time and len(dns_servers) > 1:
+                    fallback_time = dns_servers[1]
 
     if not prim_time:
         prim_time = DEFAULT_NTP_SERVERS
@@ -418,9 +419,9 @@ def get_time_server_hints(prim_time, fallback_time):
     return prim_time, fallback_time
 
 
-def get_current_dhcp_options():
+def get_dhcp_options():
     """
-    Currently just returns the first lease values it finds and does no checking
+    Note: does not validity checking (yet)
 
     :return:
     """
@@ -432,7 +433,9 @@ def get_current_dhcp_options():
                 line = line.strip()
                 if in_lease:
                     if line == '}':
-                        return current_lease_options
+                        yield current_lease_options
+                        current_lease_options = {}
+                        in_lease = False
                     elif line.startswith('option '):
                         option_name, value = line.split(' ', 1)
                         current_lease_options[option_name] = value
