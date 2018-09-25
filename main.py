@@ -219,7 +219,7 @@ class Constants:
     TXT_MESSAGE_STATIC = 'Configuring for static IP address...'
     TXT_MESSAGE_ERROR = '\Zb\Z1Error: %s\n\n\Z0Please try again.'
     TXT_CONFIG_STATIC_TITLE = 'Provide the values for static IP configuration'
-    TXT_TIMESERVER_STATUS = 'Time Server Status\n\nPrimary:%s\nSecondary:%s'
+    TXT_TIMESERVER_STATUS = 'Time Server Status:\n\n{0}\n\nNTP:{1}\nFallback:{2}'
 
 
 def clear_quit():
@@ -367,7 +367,10 @@ def conigure_ntp(dlg):
     prim_time, fallback_time = get_time_settings()
 
     code, tag = dlg.yesno(
-        Constants.TXT_TIMESERVER_STATUS % (timeserver_status, prim_time, fallback_time),
+        Constants.TXT_TIMESERVER_STATUS.format(
+            timeserver_status,
+            prim_time,
+            fallback_time),
         height=15,
         width=65,
         yes_label='Change',
