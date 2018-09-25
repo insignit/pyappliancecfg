@@ -498,4 +498,10 @@ if __name__ == '__main__':
     # display available interfaces to configure
     dlg = Dialog(dialog='dialog', autowidgetsize=True)
     dlg.set_background_title(Constants.TXT_BACKGROUND_TITLE)
-    main(dlg)
+    try:
+        main(dlg)
+    except KeyboardInterrupt:
+        os.kill(os.getppid(), 9)
+    except Exception as ex:
+        dlg.infobox('An error occurred: {}'.format(ex))
+        os.kill(os.getppid(), 9)
