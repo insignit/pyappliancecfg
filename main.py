@@ -437,7 +437,7 @@ def get_dhcp_options():
                         current_lease_options = {}
                         in_lease = False
                     elif line.startswith('option '):
-                        option_name, value = line.split(' ', 1)
+                        option_name, value = line[7:-1].split(' ', 1)
                         current_lease_options[option_name] = value
                 elif line.startswith('lease') and line.endswith('{'):
                     in_lease = True
