@@ -7,6 +7,7 @@ import re
 import subprocess
 import sys
 from os import listdir
+from os.path import join
 
 from dialog import Dialog
 from debinterface.interfaces import Interfaces
@@ -424,7 +425,7 @@ def get_current_dhcp_options():
     :return:
     """
     for file in listdir(DHCP_DIR):
-        with open(file, 'r') as fl:
+        with open(join(DHCP_DIR, file), 'r') as fl:
             in_lease = False
             current_lease_options = {}
             for line in fl.readlines():
