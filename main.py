@@ -370,20 +370,23 @@ def get_timeserver_status():
 
 
 def configure_ntp(dlg):
-    timeserver_status = get_timeserver_status()
-    prim_time, fallback_time = get_time_settings()
+    while True:
+        timeserver_status = get_timeserver_status()
+        prim_time, fallback_time = get_time_settings()
 
-    ntp_txt = Constants.TXT_NTP_SERVERS.format(prim_time, fallback_time) \
-        if (prim_time or fallback_time) else ''
+        ntp_txt = Constants.TXT_NTP_SERVERS.format(prim_time, fallback_time) \
+            if (prim_time or fallback_time) else ''
 
-    code, tag = dlg.yesno(
-        Constants.TXT_TIMESERVER_STATUS.format(
-            timeserver_status,
-            ntp_txt),
-        yes_label='Set NTP',
-        no_label='Cancel')
+        code, tag = dlg.yesno(
+            Constants.TXT_TIMESERVER_STATUS.format(
+                timeserver_status,
+                ntp_txt),
+            yes_label='Set NTP',
+            no_label='Cancel')
 
-    if code not in (Dialog.CANCEL, Dialog.ESC):
+        if code in (Dialog.CANCEL, Dialog.ESC):
+            return
+
         if not prim_time or not fallback_time:
             prim_time, fallback_time = get_time_server_hints(
                 prim_time,
@@ -392,11 +395,45 @@ def configure_ntp(dlg):
         code, values = dlg.form(Constants.TXT_CONFIG_NTP_TITLE, [
             # title, row_nr, column_nr, field,
             #       row_nr, column_20, field_length, input_length
-            ('Primary', 1, 1, prim_time, 1, 20, 15, 45),
-            ('Fallback', 2, 1, fallback_time, 2, 20, 15, 45)], width=70)
+            ('Primary', 1, 1, prim_time, 1, 20, 35, 45),
+            ('Fallback', 2, 1, fallback_time, 2, 20, 35, 45)], width=70)
 
         if code in (Dialog.CANCEL, Dialog.ESC):
             return
+
+        write_ntp_settings(values[0], values[1])
+        restart_ntp_service()
+        if 'NTP synchronized: yes' not in timeserver_status:
+            set_ntp()
+
+
+def set_ntp():
+    return get_term_stdout(['timedatectl', 'set-ntp' 'true'])
+
+
+def restart_ntp_service():
+    return get_term_stdout(['service', 'timedatectl', 'restart'])
+
+
+def write_ntp_settings(prim_time, fallback_time):
+    lines = []
+    with open(TIME_SYNCD_CONF, 'r') as conffl:
+        for line in conffl:
+            lines.append(line)
+            stripped = line.strip()
+            if stripped.startswith('NTP='):
+                if prim_time:
+                    lines.append('NTP={}\n'.format(prim_time))
+                else:
+                    lines.append(line)
+            elif stripped.startswith('FallbackNTP='):
+                if fallback_time:
+                    lines.append('FallbackNTP={}\n'.format(fallback_time))
+                else:
+                    lines.append(line)
+
+    with open(TIME_SYNCD_CONF, 'wr') as conffl:
+        conffl.writelines(lines)
 
 
 def get_time_server_hints(prim_time, fallback_time):
