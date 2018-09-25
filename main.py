@@ -401,7 +401,7 @@ def configure_ntp(dlg):
         return
 
     write_ntp_settings(values[0], values[1])
-    restart_ntp_service()
+    restart_timesyncd()
     if 'NTP synchronized: yes' not in timeserver_status:
         set_ntp()
 
@@ -410,29 +410,17 @@ def set_ntp():
     return get_term_stdout(['timedatectl', 'set-ntp' 'true'])
 
 
-def restart_ntp_service():
-    return get_term_stdout(['service', 'timedatectl', 'restart'])
+def restart_timesyncd():
+    return get_term_stdout(['systemctl', 'restart', 'systemd-timesyncd'])
 
 
 def write_ntp_settings(prim_time, fallback_time):
-    lines = []
-    with open(TIME_SYNCD_CONF, 'r') as conf_fl:
-        for line in conf_fl:
-            lines.append(line)
-            stripped = line.strip()
-            if stripped.startswith('NTP='):
-                if prim_time:
-                    lines.append('NTP={}\n'.format(prim_time))
-                else:
-                    lines.append(line)
-            elif stripped.startswith('FallbackNTP='):
-                if fallback_time:
-                    lines.append('FallbackNTP={}\n'.format(fallback_time))
-                else:
-                    lines.append(line)
-
     with open(TIME_SYNCD_CONF, 'w') as conf_fl:
-        conf_fl.writelines(lines)
+        conf_fl.writelines([
+            '[Time]\n'
+            'NTP={}\n'.format(prim_time),
+            'FallbackNTP={}\n'.format(fallback_time)
+        ])
 
 
 def get_time_server_hints(prim_time, fallback_time):
@@ -449,7 +437,10 @@ def get_time_server_hints(prim_time, fallback_time):
                 if not fallback_time and len(dns_servers) > 1:
                     fallback_time = dns_servers[1]
 
-    if not prim_time:
+    if prim_time:
+        if not fallback_time:
+            fallback_time = DEFAULT_NTP_SERVERS
+    else:
         prim_time = DEFAULT_NTP_SERVERS
 
     return prim_time, fallback_time
