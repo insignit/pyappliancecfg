@@ -2,7 +2,7 @@
 
 This will help you configure simple network settings for an appliance / vm
 
-http://g.recordit.co/uBwLg8J95a.gif
+![](http://g.recordit.co/uBwLg8J95a.gif)
 
 This is a fork with parents:
 - https://github.com/pasqumirk/pydialog-interfaces
