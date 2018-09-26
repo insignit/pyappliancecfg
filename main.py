@@ -6,8 +6,7 @@ import os
 import re
 import subprocess
 import sys
-from os import listdir
-from os.path import join, abspath
+from os.path import abspath
 
 import argparse
 from dialog import Dialog
@@ -430,50 +429,12 @@ def write_ntp_settings(prim_time, fallback_time):
 
 
 def get_time_server_hints(prim_time, fallback_time):
-    for dhcp_lease_options in get_dhcp_options():
-        print('found options', dhcp_lease_options)
-        if dhcp_lease_options \
-                and 'domain-name-servers' in dhcp_lease_options:
-            dns_servers = dhcp_lease_options['domain-name-servers'].split(',')
-            if dns_servers:
-
-                if not prim_time:
-                    prim_time = dns_servers[0]
-
-                if not fallback_time and len(dns_servers) > 1:
-                    fallback_time = dns_servers[1]
-
-    if prim_time:
-        if not fallback_time:
-            fallback_time = DEFAULT_NTP_SERVERS
-    else:
+    if not prim_time:
         prim_time = DEFAULT_NTP_SERVERS
+    elif not fallback_time and prim_time != DEFAULT_NTP_SERVERS:
+        fallback_time = DEFAULT_NTP_SERVERS
 
     return prim_time, fallback_time
-
-
-def get_dhcp_options():
-    """
-    Note: does not validity checking (yet)
-
-    :return:
-    """
-    for file in listdir(DHCP_DIR):
-        with open(join(DHCP_DIR, file), 'r') as fl:
-            in_lease = False
-            current_lease_options = {}
-            for line in fl.readlines():
-                line = line.strip()
-                if in_lease:
-                    if line == '}':
-                        yield current_lease_options
-                        current_lease_options = {}
-                        in_lease = False
-                    elif line.startswith('option '):
-                        option_name, value = line[7:-1].split(' ', 1)
-                        current_lease_options[option_name] = value
-                elif line.startswith('lease') and line.endswith('{'):
-                    in_lease = True
 
 
 def run_external_config(external_config):
@@ -486,8 +447,7 @@ def main(
         dlg,
         external_config,
         external_config_name,
-        external_config_descr,
-        hard_exit=False):
+        external_config_descr):
     choices = [
         ('Interfaces', 'static/dchp config'),
         ('NTP', 'time server'),
@@ -505,7 +465,7 @@ def main(
             choices=choices)
 
         if code in (Dialog.CANCEL, Dialog.ESC):
-            hard_quit() if hard_exit else clear_quit()
+            clear_quit()
 
         if tag == 'Interfaces':
             configure_interfaces(dlg)
@@ -534,11 +494,6 @@ if __name__ == '__main__':
     parser.add_argument('--external_config_descr',
                         help='description for the external config application',
                         default=None)
-    parser.add_argument('--hard_exit',
-                        help='forces the application to use a hard exit '
-                             '(logging out the user)',
-                        default=False,
-                        action='store_true')
     args = parser.parse_args()
 
     # display available interfaces to configure
@@ -548,10 +503,9 @@ if __name__ == '__main__':
         main(dlg,
              external_config=args.external_config,
              external_config_name=args.external_config_name,
-             external_config_descr=args.external_config_descr,
-             hard_exit=args.hard_exit)
+             external_config_descr=args.external_config_descr)
     except KeyboardInterrupt:
-        hard_quit() if args.hard_exit else clear_quit()
+        clear_quit()
     except Exception as ex:
         dlg.msgbox('An error occurred: {}'.format(ex))
-        hard_quit() if args.hard_exit else clear_quit()
+        clear_quit()
