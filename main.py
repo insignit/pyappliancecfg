@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 from __future__ import print_function
 import locale
@@ -7,8 +7,9 @@ import re
 import subprocess
 import sys
 from os import listdir
-from os.path import join
+from os.path import join, abspath
 
+import argparse
 from dialog import Dialog
 from debinterface.interfaces import Interfaces
 
@@ -23,6 +24,16 @@ if PY3:
 
 IP4PATTERN = re.compile(r'(([01]?[0-9]?[0-9]|2[0-4][0-9]|2[5][0-5])\.)'
                         r'{3}([01]?[0-9]?[0-9]|2[0-4][0-9]|2[5][0-5])')
+
+
+def clear_quit():
+    os.system('clear')
+    sys.exit(0)
+
+
+def hard_quit():
+    os.system('clear')
+    os.kill(os.getppid(), 9)
 
 
 def is_ip4(inp):
@@ -212,7 +223,7 @@ def get_active_ip_values(iface_name):
 class Constants:
     DHCP = 'dhcp'
     STATIC = 'static'
-    TXT_BACKGROUND_TITLE = 'Network Interface Configuration'
+    TXT_BACKGROUND_TITLE = 'PyAppliance Interface Configuration'
     TXT_ERR_ROOT_REQUIRED = 'root privileges required. run with sudo'
     TXT_NETWORK_CFG_SUCCESS = 'Network configuration completed successfully!\n\n'
     TXT_NETWORK_CFG_ERROR = 'Error occured while configuring network interface!\n\n'
@@ -229,11 +240,6 @@ class Constants:
     TXT_CONFIG_NTP_TITLE = 'Provide NTP server addresses'
 
 
-def clear_quit():
-    os.system('clear')
-    sys.exit(0)
-
-
 def write_and_display_results(dlg, interfaces, selected_iface):
     interfaces.writeInterfaces()
 
@@ -246,7 +252,6 @@ def write_and_display_results(dlg, interfaces, selected_iface):
     msg = to_str(result[1]).split('isc.org/software/dhcp/')[-1]
 
     dlg.msgbox(text + msg)
-    clear_quit()
 
 
 def configure_static_interface(
@@ -470,38 +475,82 @@ def get_dhcp_options():
                     in_lease = True
 
 
-def main(dlg):
+def run_external_config(external_config):
+    subprocess.run(
+        abspath(external_config),
+        shell=True)
+
+
+def main(
+        dlg,
+        external_config,
+        external_config_name,
+        external_config_descr,
+        hard_exit=False):
+    choices = [
+        ('Interfaces', 'static/dchp config'),
+        ('NTP', 'time server'),
+    ]
+
+    if external_config:
+        ext_config_option = external_config_name or external_config
+        choices.append((ext_config_option, external_config_descr or ''))
+    else:
+        ext_config_option = None
+
     while True:
         code, tag = dlg.menu(
             Constants.TXT_WELCOME_TITLE,
-            choices=[
-                ('Interfaces', 'static/dchp config'),
-                ('NTP', 'time server'),
-            ])
+            choices=choices)
 
         if code in (Dialog.CANCEL, Dialog.ESC):
-            clear_quit()
+            hard_quit() if hard_exit else clear_quit()
 
         if tag == 'Interfaces':
             configure_interfaces(dlg)
-        else:
+        elif tag == 'NTP':
             configure_ntp(dlg)
+        elif tag == ext_config_option:
+            run_external_config(external_config)
+        else:
+            raise Exception('Unknown option {}'.format(tag))
 
 
 if __name__ == '__main__':
     # some sanity checks here, sudo only
     locale.setlocale(locale.LC_ALL, '')
-    if os.getuid() != 0:
-        print(Constants.TXT_ERR_ROOT_REQUIRED)
-        sys.exit(1)
+    # if os.getuid() != 0:
+    #     print(Constants.TXT_ERR_ROOT_REQUIRED)
+    #     sys.exit(1)
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--external_config',
+                        help='external config application',
+                        default=None)
+    parser.add_argument('--external_config_name',
+                        help='display name for the external config application',
+                        default=None)
+    parser.add_argument('--external_config_descr',
+                        help='description for the external config application',
+                        default=None)
+    parser.add_argument('--hard_exit',
+                        help='forces the application to use a hard exit '
+                             '(logging out the user)',
+                        default=False,
+                        action='store_true')
+    args = parser.parse_args()
 
     # display available interfaces to configure
     dlg = Dialog(dialog='dialog', autowidgetsize=True)
     dlg.set_background_title(Constants.TXT_BACKGROUND_TITLE)
     try:
-        main(dlg)
+        main(dlg,
+             external_config=args.external_config,
+             external_config_name=args.external_config_name,
+             external_config_descr=args.external_config_descr,
+             hard_exit=args.hard_exit)
     except KeyboardInterrupt:
-        os.kill(os.getppid(), 9)
+        hard_quit() if args.hard_exit else clear_quit()
     except Exception as ex:
-        dlg.infobox('An error occurred: {}'.format(ex))
-        os.kill(os.getppid(), 9)
+        dlg.msgbox('An error occurred: {}'.format(ex))
+        hard_quit() if args.hard_exit else clear_quit()
