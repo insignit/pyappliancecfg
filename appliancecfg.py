@@ -359,8 +359,8 @@ def configure_interfaces(dlg):
 def get_time_settings():
     prim = ''
     fallback = ''
-    with open(TIME_SYNCD_CONF, 'r') as conffl:
-        for line in conffl:
+    with open(TIME_SYNCD_CONF, 'r') as conf_fl:
+        for line in conf_fl:
             stripped = line.strip()
             if stripped.startswith('NTP='):
                 prim = stripped[4:]
