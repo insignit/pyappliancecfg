@@ -289,6 +289,7 @@ def configure_static_interface(
                 'gateway': values[2]}, 0)
 
             write_and_display_results(dlg, interfaces, selected_iface)
+            return
         except Exception as ex:
             dlg.msgbox(text=Constants.TXT_MESSAGE_ERROR % ex, colors=True)
 
